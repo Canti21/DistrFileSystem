@@ -8,11 +8,11 @@ def procesar_mensaje(mensaje, cliente):
 
     if mensaje == "REGISTRO":
         # Registrar nuevo nodo
-        nodos_disponibles.append(cliente)
+        nodos_disponibles.append(str(cliente))
         print(f"Nodo registrado: {cliente}")
     elif mensaje == "DESCUBRIR":
         # Enviar lista de nodos disponibles al cliente
-        respuesta = ",".join(nodos_disponibles)
+        respuesta = ",".join(map(str, nodos_disponibles))
         cliente.send(respuesta.encode())
     else:
         # Otra lógica de procesamiento de mensajes según tu caso de uso
