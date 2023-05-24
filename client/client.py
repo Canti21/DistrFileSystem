@@ -139,9 +139,7 @@ def execute(operation, file_path):
             print("El archivo especificado no existe.")
 
     elif operation == "DESCARGAR":
-        # Solicitar nombre del archivo al usuario
-        file_name = input("Ingresa el nombre del archivo que deseas recibir: ")
-
+        
         available_nodes = discover_nodes()
 
         if len(available_nodes) > 0:
@@ -159,7 +157,7 @@ def execute(operation, file_path):
                         client_socket.sendall(command.encode())
 
                         # Envía el nombre del archivo al nodo
-                        client_socket.sendall(file_name.encode())
+                        client_socket.sendall(file_path.encode())
 
                         # Recibe la respuesta del nodo
                         response = client_socket.recv(1024).decode()
@@ -167,12 +165,12 @@ def execute(operation, file_path):
                         if response == "EXISTE":
                             # Recibe el archivo del nodo
                             file_size = client_socket.recv(1024).decode()
-                            receive_file(file_name, file_size, client_socket)
+                            receive_file(client_socket)
 
-                            print(f"Archivo {file_name} recibido correctamente.")
+                            print(f"Archivo {file_path} recibido correctamente.")
                             return
                         elif response == "NO_EXISTE":
-                            print(f"El archivo {file_name} no existe en el sistema.")
+                            print(f"El archivo {file_path} no existe en el sistema.")
                             break
 
                     except ConnectionRefusedError:
@@ -194,6 +192,11 @@ def verify_path():
         print("Ejecutando")
         execute("SUBIR", PATH)
 
+def get_content():
+    content = textbox.get()
+    if content is not None:
+        execute("DESCARGAR", content)
+
 if __name__ == '__main__':
     # Crea la ventana principal
     ventana = Tk()
@@ -204,6 +207,12 @@ if __name__ == '__main__':
 
     uploadButton = Button(ventana, text="Subir", command=verify_path)
     uploadButton.pack()
+
+    textbox = Entry(ventana)
+    textbox.pack()
+
+    fetchButton = Button(ventana, text="Obtener", command=get_content)
+    fetchButton.pack()
 
     # Ejecuta el bucle principal de la ventana
     ventana.mainloop()

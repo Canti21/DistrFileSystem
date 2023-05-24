@@ -222,8 +222,21 @@ def check_file(connection, file_name):
     file_path = os.path.join(DATA_FOLDER, file_name)
 
     if os.path.isfile(file_path):
-        send_file(file_path)
-        print(f"Archivo {file_name} enviado al usuario")
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+            try:
+                # Conecta el socket al nodo
+                client_socket.connect((node_host, PORT))
+
+                # Envía el comando al nodo
+                command = "EXISTE"
+                client_socket.sendall(command.encode())
+
+                send_file(file_path)
+                print(f"Archivo {file_name} enviado al usuario")
+
+            except ConnectionRefusedError:
+                print(f"No se pudo conectar al nodo {node_address}. Intentando con otro nodo...")
+                
     else:
         # El archivo no existe en este nodo, verificar en otros nodos
         available_nodes = discover_nodes()
@@ -249,7 +262,7 @@ def check_file(connection, file_name):
                     # Recibe la respuesta del nodo
                     response = client_socket.recv(1024).decode()
 
-                    if response != "El archivo solicitado no existe en este nodo":
+                    if response != "NO_EXISTE":
                         # El archivo existe en el nodo, se envía al cliente
                         connection.sendall(response.encode())
                         replicas_encontradas = True
@@ -262,7 +275,7 @@ def check_file(connection, file_name):
 
         if not replicas_encontradas:
             # El archivo no existe en ningún nodo
-            message = "El archivo solicitado no existe en ningún nodo"
+            message = "NO_EXISTE"
             connection.sendall(message.encode())
             print(f"El archivo {file_name} no existe en ningún nodo")
 
@@ -316,11 +329,11 @@ def start_node():
             if command == 'ENVIAR':
                 # El cliente quiere enviar un archivo
                 receive_file(connection)
-            elif command == 'RECUPERAR':
+            elif command == 'DESCARGAR':
                 # El cliente quiere recuperar un archivo
                 file_name = connection.recv(1024).decode()
                 print(f"Solicitando archivo: {file_name}")
-                send_file(connection, file_name)
+                check_file(connection, file_name)
             elif command == 'REPLICAR':
                 # El cliente quiere enviar una réplica de archivo
                 receive_replica(connection)
