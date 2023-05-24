@@ -89,10 +89,10 @@ def replicate_file(file_name):
 
             if len(available_nodes) > 1:
                 # Elimina el nodo actual de la lista de nodos disponibles
-                available_nodes.remove(str(HOST))
+                available_nodes.remove(HOST)
 
                 # Elige un nodo al azar para replicar el archivo
-                for node in nodos_disponibles:
+                for node in available_nodes:
 
                     # Crea un socket TCP para conectarse al nodo de replicación
                     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as node_socket:
@@ -112,6 +112,7 @@ def replicate_file(file_name):
                             node_socket.sendall(file_data)
 
                             print(f"Archivo {file_name} replicado en nodo {node}")
+                            return
                         except ConnectionRefusedError:
                             print(f"No se pudo replicar el archivo {file_name} en nodo {node}")
                         finally:
