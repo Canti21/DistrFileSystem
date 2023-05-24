@@ -45,53 +45,56 @@ def receive_file(file_name, file_size, connection):
     print(f"Archivo {file_name} recibido y almacenado en {file_path}")
 
 def send_file(file_path):
-    available_nodes = discover_nodes()
+    i = 0
+    while i < 3:
+        available_nodes = discover_nodes()
 
-    if len(available_nodes) > 0:
-        file_name = os.path.basename(file_path)
+        if len(available_nodes) > 0:
+            file_name = os.path.basename(file_path)
 
-        for node_address in available_nodes:
-            node_host = node_address
+            for node_address in available_nodes:
+                node_host = node_address
 
-            # Crea un socket TCP
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-                try:
-                    # Conecta el socket al nodo destino
-                    client_socket.connect((node_host, 8100))
+                # Crea un socket TCP
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+                    try:
+                        # Conecta el socket al nodo destino
+                        client_socket.connect((node_host, 8100))
 
-                    # Envía el comando al nodo
-                    command = "ENVIAR"
-                    client_socket.sendall(command.encode())
+                        # Envía el comando al nodo
+                        command = "ENVIAR"
+                        client_socket.sendall(command.encode())
 
-                    # Recibe la respuesta del nodo
-                    response = client_socket.recv(1024).decode()
-
-                    if response == "READY":
-                        # Obtiene el tamaño del archivo
-                        file_size = os.path.getsize(file_path)
-
-                        # Envía los datos del archivo (nombre y tamaño)
-                        file_data = f"{file_name},{file_size}"
-                        client_socket.sendall(file_data.encode())
-
-                        # Lee y envía el contenido del archivo en bloques
-                        with open(file_path, 'rb') as file:
-                            for chunk in iter(lambda: file.read(1024), b''):
-                                client_socket.sendall(chunk)
-                        
+                        # Recibe la respuesta del nodo
                         response = client_socket.recv(1024).decode()
-                        if response == "SUCCESS":
-                            print(f"Archivo {file_name} enviado correctamente al nodo {node_address}")
-                        else:
-                            send_file(file_path)
-                        return
 
-                except ConnectionRefusedError:
-                    print(f"No se pudo conectar al nodo {node_address}. Intentando con otro nodo...")
-                except ConnectionResetError:
-                    print(f"Hubo un error de conexion...")
+                        if response == "READY":
+                            # Obtiene el tamaño del archivo
+                            file_size = os.path.getsize(file_path)
 
-    print("No se encontraron nodos disponibles en el sistema o todos los nodos estaban inaccesibles.")
+                            # Envía los datos del archivo (nombre y tamaño)
+                            file_data = f"{file_name},{file_size}"
+                            client_socket.sendall(file_data.encode())
+
+                            # Lee y envía el contenido del archivo en bloques
+                            with open(file_path, 'rb') as file:
+                                for chunk in iter(lambda: file.read(1024), b''):
+                                    client_socket.sendall(chunk)
+                            
+                            response = client_socket.recv(1024).decode()
+                            if response == "SUCCESS":
+                                print(f"Archivo {file_name} enviado correctamente al nodo {node_address}")
+                            else:
+                                send_file(file_path)
+                            return
+
+                    except ConnectionRefusedError:
+                        print(f"No se pudo conectar al nodo {node_address}. Intentando con otro nodo...")
+                    except ConnectionResetError:
+                        print(f"Hubo un error de conexion...")
+
+        print("No se encontraron nodos disponibles en el sistema o todos los nodos estaban inaccesibles.")
+        i = i + 1;
 
 def start_client():
     while True:
