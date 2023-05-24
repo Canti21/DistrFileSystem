@@ -1,6 +1,6 @@
 import os
 import socket
-from tkinter import Tk, Button, filedialog, Entry, Toplevel
+from tkinter import Tk, Button, filedialog, Entry, Toplevel, Label
 from tkinter.messagebox import showinfo
 
 # Dirección IP y puerto del servidor de nodos
@@ -85,6 +85,7 @@ def send_file(file_path):
     file_upload_error()
 
 def receive_file(file_name):
+    founded = False
     available_nodes = discover_nodes()
     for node in available_nodes:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
@@ -122,13 +123,17 @@ def receive_file(file_name):
                     
                     client_socket.sendall("SUCCESS".encode())
                     print(f"Archivo {file_name} recibido y almacenado en {file_path}")
-                else:
-                    file_404()
+                    file_download_success(file_name)
+                    founded = True
+                    break
 
             except ConnectionRefusedError:
                 print(f"No se pudo conectar al nodo {node}. Intentando con otro nodo...")
             except ConnectionResetError:
                 print(f"Hubo un error de conexion...")
+    
+    if not founded:
+        file_404()
 
 def file_upload_success():
     pop = Tk()
@@ -162,6 +167,14 @@ def file_download_error():
 
     pop.destroy()
 
+def file_download_success(file_name):
+    pop = Tk()
+    pop.withdraw()
+
+    showinfo("Exito", f"El archivo '{file_name}' fue guardado en data_client")
+
+    pop.destroy()
+
 
 def execute(operation, file_path):
     if operation == "SUBIR":
@@ -181,6 +194,7 @@ def select_file():
     global PATH
     file = filedialog.askopenfilename()
     PATH = file
+    fileLabel.config(text=f"Archivo: {file}")
 
 def verify_path():
     global PATH
@@ -190,18 +204,22 @@ def verify_path():
 
 def get_content():
     content = textbox.get()
-    if content is not None:
+    if content.strip() != "":
         execute("DESCARGAR", content)
 
 if __name__ == '__main__':
     # Crea la ventana principal
     ventana = Tk()
 
+    # Crea la etiqueta que indica el archivo
+    fileLabel = Label(ventana, text="Fakepath::", width=70, height=2, padx=10, pady=5, font=("Arial", 12))
+    fileLabel.pack()
+
     # Crea el botón de selección de archivo
-    fileButton = Button(ventana, text="Seleccionar archivo", command=select_file)
+    fileButton = Button(ventana, text="Seleccionar archivo", command=select_file, width=15, height=2, padx=10, pady=5, font=("Arial", 12))
     fileButton.pack()
 
-    uploadButton = Button(ventana, text="Subir", command=verify_path)
+    uploadButton = Button(ventana, text="Subir", command=verify_path, width=15, height=2, padx=10, pady=1.2, bg="#4bfa8e", font=("Arial", 12))
     uploadButton.pack()
 
     textbox = Entry(ventana)
