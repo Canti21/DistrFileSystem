@@ -83,6 +83,7 @@ def send_file_replica(file_path):
     i = 0
     while i < 3:
         available_nodes = discover_nodes()
+        available_nodes.remove(HOST)
 
         if len(available_nodes) > 0:
             file_name = os.path.basename(file_path)
@@ -212,9 +213,9 @@ def start_node():
         # Escucha las conexiones entrantes
         server_socket.listen()
 
-        print("El nodo está listo y esperando conexiones...")
-
         while True:
+            print("El nodo está listo y esperando conexiones...")
+
             # Acepta la conexión entrante del cliente
             connection, address = server_socket.accept()
 
