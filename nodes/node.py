@@ -231,8 +231,7 @@ def start_node():
                     # El archivo existe en este nodo, envíalo al cliente
                     try:
                         # Notifica al cliente que el nodo está listo para enviar el archivo
-                        ready_message = "READY"
-                        connection.sendall(ready_message.encode())
+                        response = client_socket.recv(1024).decode()
 
                         # Envía los datos del archivo (nombre y tamaño)
                         file_size = os.path.getsize(file_path)
@@ -240,7 +239,7 @@ def start_node():
                         connection.sendall(file_data.encode())
 
                         # Envía el contenido del archivo en bloques
-                        with open(file_data, 'rb') as file:
+                        with open(file_path, 'rb') as file:
                             for chunk in iter(lambda: file.read(1024), b''):
                                 connection.sendall(chunk)
 
