@@ -98,7 +98,7 @@ def send_file_replica(file_path):
                         client_socket.connect((node_host, 8100))
 
                         # Envía el comando al nodo
-                        command = "ENVIAR"
+                        command = "REPLICAR"
                         client_socket.sendall(command.encode())
 
                         # Recibe la respuesta del nodo
@@ -121,7 +121,7 @@ def send_file_replica(file_path):
                             if response == "SUCCESS":
                                 print(f"Replica {file_name} enviado correctamente al nodo {node_address}")
                             else:
-                                i = i + 1;
+                                send_file_replica(file_path)
                             return
 
                     except ConnectionRefusedError:
@@ -133,10 +133,13 @@ def send_file_replica(file_path):
         i = i + 1;
 
 def receive_replica(connection):
+    # Notifica al cliente que el nodo está listo para recibir
+    ready_message = "READY"
+    connection.sendall(ready_message.encode())
+    # Recibe los datos del archivo (nombre, peso, etc.)
     try:
-        # Recibe los datos del archivo (nombre, peso, etc.)
         file_data = connection.recv(1024).decode()
-        file_name = file_data
+        file_name, file_size = file_data.split(',')
 
         # Crea el directorio "data" si no existe
         if not os.path.exists(DATA_FOLDER):
@@ -147,21 +150,22 @@ def receive_replica(connection):
 
         # Recibe y almacena el archivo en la carpeta "data"
         with open(file_path, 'wb') as file:
-            while True:
+            remaining_bytes = int(file_size)
+            while remaining_bytes > 0:
                 chunk = connection.recv(1024)
-                if not chunk:
-                    break
                 file.write(chunk)
-
+                remaining_bytes -= len(chunk)
+        
         connection.sendall("SUCCESS".encode())
-        print(f"Réplica del archivo {file_name} recibida y almacenada en {file_path}")
+        print(f"Archivo {file_name} recibido y almacenado en {file_path}")
 
         # Actualiza la información de archivos en este nodo
         with mutex:
             archivos_nodos[file_name] = str(socket.gethostbyname(socket.gethostname()))
+
     except UnicodeDecodeError:
         connection.sendall("FAILURE".encode())
-        print("Ocurrio un error al recibir la replica el archivo.")
+        print("Ocurrio un error al recibir el archivo.")
 
 def send_file(connection, file_name):
     # Ruta completa del archivo en el directorio "data"
