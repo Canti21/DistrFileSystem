@@ -121,7 +121,7 @@ def send_file_replica(file_path):
                             if response == "SUCCESS":
                                 print(f"Replica {file_name} enviado correctamente al nodo {node_address}")
                             else:
-                                send_file_replica(file_path)
+                                i = i + 1;
                             return
 
                     except ConnectionRefusedError:
