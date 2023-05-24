@@ -20,7 +20,8 @@ def procesar_mensaje(mensaje, cliente):
 
 def main():
     # Configuración del servidor
-    host = '192.168.1.75'
+    hostname = socket.gethostname()
+    host = socket.gethostbyname(hostname)
     port = 8000
 
     # Crear socket del servidor
@@ -28,7 +29,7 @@ def main():
     servidor.bind((host, port))
     servidor.listen(10)
 
-    print(f"Servidor central escuchando en {host}:{port}")
+    print(f"Servidor escuchando en {host}:{port}")
 
     while True:
         # Esperar conexiones entrantes
