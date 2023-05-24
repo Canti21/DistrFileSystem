@@ -88,6 +88,8 @@ def send_file(file_path):
 
                 except ConnectionRefusedError:
                     print(f"No se pudo conectar al nodo {node_address}. Intentando con otro nodo...")
+                except ConnectionResetError:
+                    print(f"Hubo un error de conexion...")
 
     print("No se encontraron nodos disponibles en el sistema o todos los nodos estaban inaccesibles.")
 

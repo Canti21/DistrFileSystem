@@ -46,10 +46,10 @@ def receive_file(connection):
     ready_message = "READY"
     connection.sendall(ready_message.encode())
     # Recibe los datos del archivo (nombre, peso, etc.)
-    file_data = connection.recv(1024).decode()
-    file_name, file_size = file_data.split(',')
-
     try:
+        file_data = connection.recv(1024).decode()
+        file_name, file_size = file_data.split(',')
+
         # Crea el directorio "data" si no existe
         if not os.path.exists(DATA_FOLDER):
             os.makedirs(DATA_FOLDER)
