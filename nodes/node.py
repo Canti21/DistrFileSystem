@@ -90,13 +90,13 @@ def replicate_file(file_name):
 
         # Elige un nodo al azar para replicar el archivo
         node_address = available_nodes[0]
-        node_host, node_port = node_address.split(':')
+        node_host = node_address.split(':')
 
         # Crea un socket TCP para conectarse al nodo de replicación
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as node_socket:
             try:
                 # Conecta el socket al nodo de replicación
-                node_socket.connect((node_host, int(node_port)))
+                node_socket.connect((node_host, PORT))
 
                 # Envía el mensaje de registro al nodo de replicación (opcional)
                 node_socket.sendall("REPLICAR".encode())
