@@ -94,7 +94,8 @@ def send_file(file_path):
 def start_client():
     while True:
         # Solicitar operación al usuario (SUBIR o DESCARGAR o RECIBIR)
-        operation = input("Ingresa la operación que deseas realizar (SUBIR, DESCARGAR o RECIBIR): ")
+        #operation = input("Ingresa la operación que deseas realizar (SUBIR, DESCARGAR o RECIBIR): ")
+        operation = "SUBIR"
 
         if operation == "SUBIR":
             # Solicitar ruta del archivo al usuario

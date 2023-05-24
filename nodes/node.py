@@ -77,6 +77,7 @@ def receive_file(connection):
 
     except UnicodeDecodeError:
         connection.sendall("FAILURE".encode())
+        print("Ocurrio un error al recibir el archivo.")
 
 def replicate_file(file_name):
     # Descubre otro nodo disponible para replicar el archivo
@@ -85,7 +86,7 @@ def replicate_file(file_name):
 
     if len(available_nodes) > 1:
         # Elimina el nodo actual de la lista de nodos disponibles
-        available_nodes.remove(str(socket.gethostbyname(socket.gethostname())))
+        available_nodes.remove(str(HOST))
 
         # Elige un nodo al azar para replicar el archivo
         node_address = available_nodes[0]
