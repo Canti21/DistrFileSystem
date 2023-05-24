@@ -221,6 +221,7 @@ def start_node():
 
                 # Ruta completa del archivo en la carpeta "data"
                 file_path = os.path.join(DATA_FOLDER, file_name)
+                file_size = os.path.getsize(file_path)
 
                 # Verifica si el archivo existe en el nodo actual
                 if os.path.exists(file_path):
@@ -276,8 +277,8 @@ def start_node():
                                     # Recibe la respuesta del nodo
                                     response = client_socket.recv(1024).decode()
 
-                                    if response == "READY":
-                                        # Recibe los datos del archivo (nombre, peso, etc.)
+                                    if response:
+                                        client_socket.sendall("READY".encode())
                                         file_data = client_socket.recv(1024).decode()
                                         file_name, file_size = file_data.split(',')
 
@@ -295,27 +296,43 @@ def start_node():
                                                 chunk = client_socket.recv(1024)
                                                 file.write(chunk)
                                                 remaining_bytes -= len(chunk)
+                                        
+                                        client_socket.sendall("SUCCESS".encode())
+                                        print(f"Archivo {file_name} recibido y almacenado en {file_path}")
 
-                                        response = client_socket.recv(1024).decode()
-                                        if response == "SUCCESS":
-                                            print(f"Archivo {file_name} descargado correctamente desde el nodo {node_address}")
-                                            # Envía el archivo al cliente
-                                            send_file_to_client(connection, file_path)
-                                        else:
-                                            print(f"No se pudo descargar el archivo {file_name} desde el nodo {node_address}")
+                                        connection.sendall("EXISTE".encode())
 
-                                        break
+                                        try:
+                                            # Notifica al cliente que el nodo está listo para enviar el archivo
+                                            ready_message = "READY"
+                                            connection.sendall(ready_message.encode())
+
+                                            # Envía los datos del archivo (nombre y tamaño)
+                                            file_size = os.path.getsize(file_path)
+                                            file_data = f"{file_name},{file_size}"
+                                            connection.sendall(file_data.encode())
+
+                                            # Envía el contenido del archivo en bloques
+                                            with open(file_path, 'rb') as file:
+                                                for chunk in iter(lambda: file.read(1024), b''):
+                                                    connection.sendall(chunk)
+
+                                            response = connection.recv(1024).decode()
+                                            if response == "SUCCESS":
+                                                print(f"Archivo {file_name} enviado correctamente al cliente")
+                                                return
+                                            else:
+                                                print(f"Ocurrió un error al enviar el archivo {file_name} al cliente")
+
+                                        except ConnectionResetError:
+                                            print("Se perdió la conexión con el cliente.")
 
                                 except ConnectionRefusedError:
                                     print(f"No se pudo conectar al nodo {node_address}. Intentando con otro nodo...")
                                 except ConnectionResetError:
                                     print(f"Hubo un error de conexión...")
 
-                        else:
-                            # No se pudo encontrar el archivo en ningún nodo
-                            error_message = f"No se pudo encontrar el archivo {file_name} en el sistema."
-                            connection.sendall(error_message.encode())
-                            print(error_message)
+                        connection.sendall("".encode())
 
                     else:
                         # No hay otros nodos disponibles en el sistema
