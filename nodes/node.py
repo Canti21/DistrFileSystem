@@ -1,5 +1,6 @@
 import os
 import socket
+import threading
 
 # Dirección IP y puerto en el que el nodo escuchará las conexiones
 HOST = '192.168.1.74'
@@ -11,6 +12,15 @@ SERV_PORT = 8000
 
 # Carpeta donde se almacenarán los archivos recibidos
 DATA_FOLDER = 'data'
+
+# Arreglo para almacenar la lista de nodos disponibles
+nodos_disponibles = []
+
+# Diccionario para almacenar la información de archivos en cada nodo
+archivos_nodos = {}
+
+# Mutex para sincronización en el acceso a los arreglos
+mutex = threading.Lock()
 
 def receive_file(connection):
     # Recibe los datos del archivo (nombre, peso, etc.)
@@ -26,7 +36,7 @@ def receive_file(connection):
 
     # Notifica al cliente que el nodo esta listo para recibir
     ready_message = "READY"
-    connection.send(ready_message.encode())
+    connection.sendall(ready_message.encode())
 
     # Recibe y almacena el archivo en la carpeta "data"
     with open(file_path, 'wb') as file:
@@ -37,6 +47,52 @@ def receive_file(connection):
             remaining_bytes -= len(chunk)
 
     print(f"Archivo {file_name} recibido y almacenado en {file_path}")
+
+    # Replica el archivo en otro nodo
+    replicate_file(file_name)
+
+    # Actualiza la información de archivos en este nodo
+    with mutex:
+        archivos_nodos[file_name] = str(socket.gethostbyname(socket.gethostname()))
+
+def replicate_file(file_name):
+    # Descubre otro nodo disponible para replicar el archivo
+    with mutex:
+        available_nodes = list(nodos_disponibles)
+
+    if len(available_nodes) > 1:
+        # Elimina el nodo actual de la lista de nodos disponibles
+        available_nodes.remove(str(socket.gethostbyname(socket.gethostname())))
+
+        # Elige un nodo al azar para replicar el archivo
+        node_address = available_nodes[0]
+        node_host, node_port = node_address.split(':')
+
+        # Crea un socket TCP para conectarse al nodo de replicación
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as node_socket:
+            try:
+                # Conecta el socket al nodo de replicación
+                node_socket.connect((node_host, int(node_port)))
+
+                # Envía el mensaje de registro al nodo de replicación (opcional)
+                node_socket.sendall("REGISTRO".encode())
+
+                # Lee el contenido del archivo
+                file_path = os.path.join(DATA_FOLDER, file_name)
+                with open(file_path, 'rb') as file:
+                    file_data = file.read()
+
+                # Envía el archivo al nodo de replicación
+                node_socket.sendall(file_data)
+
+                print(f"Archivo {file_name} replicado en nodo {node_address}")
+            except ConnectionRefusedError:
+                print(f"No se pudo replicar el archivo {file_name} en nodo {node_address}")
+            finally:
+                # Cierra la conexión con el nodo de replicación
+                node_socket.close()
+    else:
+        print(f"No hay nodos disponibles para replicar el archivo {file_name}")
 
 def send_file(connection, file_name):
     # Ruta completa del archivo en el directorio "data"
