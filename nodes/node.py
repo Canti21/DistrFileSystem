@@ -69,7 +69,7 @@ def receive_file(connection):
         print(f"Archivo {file_name} recibido y almacenado en {file_path}")
 
         # Replica el archivo en otro nodo
-        send_file_replica(file_name)
+        send_file_replica(file_path)
 
         # Actualiza la información de archivos en este nodo
         with mutex:
