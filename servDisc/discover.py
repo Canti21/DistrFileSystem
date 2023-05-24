@@ -20,8 +20,7 @@ def procesar_mensaje(mensaje, cliente):
 
 def main():
     # Configuración del servidor
-    hostname = socket.gethostname()
-    host = socket.gethostbyname(hostname)
+    host = '192.168.1.72'
     port = 8000
 
     # Crear socket del servidor

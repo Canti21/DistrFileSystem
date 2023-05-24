@@ -2,9 +2,12 @@ import os
 import socket
 
 # Dirección IP y puerto en el que el nodo escuchará las conexiones
-hostname = socket.gethostname()
-HOST = socket.gethostbyname(hostname)
+HOST = '192.168.1.74'
 PORT = 8100
+
+# Direccion y puerto del servidor de nodos
+SERV_HOST = '192.168.1.72'
+SERV_PORT = 8000
 
 # Carpeta donde se almacenarán los archivos recibidos
 DATA_FOLDER = 'data'
