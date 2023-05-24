@@ -23,8 +23,26 @@ archivos_nodos = {}
 # Mutex para sincronización en el acceso a los arreglos
 mutex = threading.Lock()
 
+def discover_nodes():
+    # Crea un socket TCP para conectarse al servidor de registro y descubrimiento
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        # Conecta el socket al servidor
+        server_socket.connect((SERV_HOST, SERV_PORT))
+
+        # Envía el mensaje de descubrimiento al servidor
+        server_socket.sendall("DESCUBRIR".encode())
+
+        # Recibe la respuesta del servidor
+        respuesta = server_socket.recv(1024).decode()
+
+        # Cierra la conexión con el servidor
+        server_socket.close()
+
+    # Retorna la lista de nodos disponibles
+    return respuesta.split(',')
+
 def receive_file(connection):
-    # Notifica al cliente que el nodo esta listo para recibir
+    # Notifica al cliente que el nodo está listo para recibir
     ready_message = "READY"
     connection.sendall(ready_message.encode())
     # Recibe los datos del archivo (nombre, peso, etc.)
@@ -37,7 +55,6 @@ def receive_file(connection):
 
     # Ruta completa del archivo en el directorio "data"
     file_path = os.path.join(DATA_FOLDER, file_name)
-
 
     # Recibe y almacena el archivo en la carpeta "data"
     with open(file_path, 'wb') as file:
@@ -76,7 +93,7 @@ def replicate_file(file_name):
                 node_socket.connect((node_host, int(node_port)))
 
                 # Envía el mensaje de registro al nodo de replicación (opcional)
-                node_socket.sendall("REGISTRO".encode())
+                node_socket.sendall("REPLICAR".encode())
 
                 # Lee el contenido del archivo
                 file_path = os.path.join(DATA_FOLDER, file_name)
@@ -94,6 +111,32 @@ def replicate_file(file_name):
                 node_socket.close()
     else:
         print(f"No hay nodos disponibles para replicar el archivo {file_name}")
+
+def receive_replica(connection):
+    # Recibe los datos del archivo (nombre, peso, etc.)
+    file_data = connection.recv(1024).decode()
+    file_name = file_data
+
+    # Crea el directorio "data" si no existe
+    if not os.path.exists(DATA_FOLDER):
+        os.makedirs(DATA_FOLDER)
+
+    # Ruta completa del archivo en el directorio "data"
+    file_path = os.path.join(DATA_FOLDER, file_name)
+
+    # Recibe y almacena el archivo en la carpeta "data"
+    with open(file_path, 'wb') as file:
+        while True:
+            chunk = connection.recv(1024)
+            if not chunk:
+                break
+            file.write(chunk)
+
+    print(f"Réplica del archivo {file_name} recibida y almacenada en {file_path}")
+
+    # Actualiza la información de archivos en este nodo
+    with mutex:
+        archivos_nodos[file_name] = str(socket.gethostbyname(socket.gethostname()))
 
 def send_file(connection, file_name):
     # Ruta completa del archivo en el directorio "data"
@@ -136,9 +179,9 @@ def register_to_server():
 def update_available_nodes():
     while True:
         time.sleep(10)  # Espera 10 segundos antes de actualizar la lista de nodos disponibles
-
-        # Vuelve a registrarse en el servidor de nodos
-        register_to_server()
+        with mutex:
+            # Vuelve a obtener el registro en el servidor de nodos
+            discover_nodes()
 
 def start_node():
     # Anuncia al servidor de nodos que estamos en línea
@@ -175,6 +218,9 @@ def start_node():
                 file_name = connection.recv(1024).decode()
                 print(f"Solicitando archivo: {file_name}")
                 send_file(connection, file_name)
+            elif command == 'REPLICAR':
+                # El cliente quiere enviar una réplica de archivo
+                receive_replica(connection)
 
             # Cierra la conexión con el cliente
             connection.close()
