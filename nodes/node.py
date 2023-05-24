@@ -49,20 +49,24 @@ def receive_file(connection):
     file_data = connection.recv(1024).decode()
     file_name, file_size = file_data.split(',')
 
-    # Crea el directorio "data" si no existe
-    if not os.path.exists(DATA_FOLDER):
-        os.makedirs(DATA_FOLDER)
+    try:
+        # Crea el directorio "data" si no existe
+        if not os.path.exists(DATA_FOLDER):
+            os.makedirs(DATA_FOLDER)
 
-    # Ruta completa del archivo en el directorio "data"
-    file_path = os.path.join(DATA_FOLDER, file_name)
+        # Ruta completa del archivo en el directorio "data"
+        file_path = os.path.join(DATA_FOLDER, file_name)
 
-    # Recibe y almacena el archivo en la carpeta "data"
-    with open(file_path, 'wb') as file:
-        remaining_bytes = int(file_size)
-        while remaining_bytes > 0:
-            chunk = connection.recv(1024)
-            file.write(chunk)
-            remaining_bytes -= len(chunk)
+        # Recibe y almacena el archivo en la carpeta "data"
+        with open(file_path, 'wb') as file:
+            remaining_bytes = int(file_size)
+            while remaining_bytes > 0:
+                chunk = connection.recv(1024)
+                file.write(chunk)
+                remaining_bytes -= len(chunk)
+                connection.sendall("".encode())
+    except UnicodeDecodeError:
+        pass
 
     print(f"Archivo {file_name} recibido y almacenado en {file_path}")
 
@@ -76,7 +80,7 @@ def receive_file(connection):
 def replicate_file(file_name):
     # Descubre otro nodo disponible para replicar el archivo
     with mutex:
-        available_nodes = list(nodos_disponibles)
+        available_nodes = list(discover_nodes())
 
     if len(available_nodes) > 1:
         # Elimina el nodo actual de la lista de nodos disponibles
@@ -176,20 +180,9 @@ def register_to_server():
         finally:
             serv.close()
 
-def update_available_nodes():
-    while True:
-        time.sleep(10)  # Espera 10 segundos antes de actualizar la lista de nodos disponibles
-        with mutex:
-            # Vuelve a obtener el registro en el servidor de nodos
-            discover_nodes()
-
 def start_node():
     # Anuncia al servidor de nodos que estamos en línea
     register_to_server()
-
-    # Crea un hilo para actualizar la lista de nodos disponibles periódicamente
-    update_thread = threading.Thread(target=update_available_nodes)
-    update_thread.start()
 
     # Crea un socket TCP
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
@@ -212,7 +205,7 @@ def start_node():
 
             if command == 'ENVIAR':
                 # El cliente quiere enviar un archivo
-                receive_file(connection)
+                receive_file(connection, 0)
             elif command == 'RECUPERAR':
                 # El cliente quiere recuperar un archivo
                 file_name = connection.recv(1024).decode()
