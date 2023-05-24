@@ -64,18 +64,19 @@ def receive_file(connection):
                 chunk = connection.recv(1024)
                 file.write(chunk)
                 remaining_bytes -= len(chunk)
-                connection.sendall("".encode())
+        
+        connection.sendall("SUCCESS".encode())
+        print(f"Archivo {file_name} recibido y almacenado en {file_path}")
+
+        # Replica el archivo en otro nodo
+        replicate_file(file_name)
+
+        # Actualiza la información de archivos en este nodo
+        with mutex:
+            archivos_nodos[file_name] = str(socket.gethostbyname(socket.gethostname()))
+
     except UnicodeDecodeError:
-        pass
-
-    print(f"Archivo {file_name} recibido y almacenado en {file_path}")
-
-    # Replica el archivo en otro nodo
-    replicate_file(file_name)
-
-    # Actualiza la información de archivos en este nodo
-    with mutex:
-        archivos_nodos[file_name] = str(socket.gethostbyname(socket.gethostname()))
+        connection.sendall("FAILURE".encode())
 
 def replicate_file(file_name):
     # Descubre otro nodo disponible para replicar el archivo
@@ -205,7 +206,7 @@ def start_node():
 
             if command == 'ENVIAR':
                 # El cliente quiere enviar un archivo
-                receive_file(connection, 0)
+                receive_file(connection)
             elif command == 'RECUPERAR':
                 # El cliente quiere recuperar un archivo
                 file_name = connection.recv(1024).decode()

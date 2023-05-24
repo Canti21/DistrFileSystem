@@ -78,10 +78,12 @@ def send_file(file_path):
                         with open(file_path, 'rb') as file:
                             for chunk in iter(lambda: file.read(1024), b''):
                                 client_socket.sendall(chunk)
-                                response = client_socket.recv(10).decode()
                         
-
-                        print(f"Archivo {file_name} enviado correctamente al nodo {node_address}")
+                        response = client_socket.recv(1024).decode()
+                        if response == "SUCCESS":
+                            print(f"Archivo {file_name} enviado correctamente al nodo {node_address}")
+                        else:
+                            send_file(file_path)
                         return
 
                 except ConnectionRefusedError:
