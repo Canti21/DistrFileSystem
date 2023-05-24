@@ -1,5 +1,7 @@
 import os
 import socket
+from tkinter import Tk, Button, filedialog, Entry, Toplevel
+from tkinter.messagebox import showinfo
 
 # Dirección IP y puerto del servidor de nodos
 REGISTRATION_SERVER_HOST = '192.168.1.72'
@@ -7,6 +9,9 @@ REGISTRATION_SERVER_PORT = 8000
 
 # Carpeta donde se almacenarán los archivos recibidos
 DATA_FOLDER = 'data_client'
+
+# Ruta global
+PATH = None
 
 def discover_nodes():
     # Crea un socket TCP para conectarse al servidor de registro y descubrimiento
@@ -26,23 +31,35 @@ def discover_nodes():
     # Retorna la lista de nodos disponibles
     return respuesta.split(',')
 
-def receive_file(file_name, file_size, connection):
-    # Crea el directorio "data_client" si no existe
-    if not os.path.exists(DATA_FOLDER):
-        os.makedirs(DATA_FOLDER)
+def receive_file(connection):
+    # Notifica al cliente que el nodo está listo para recibir
+    ready_message = "READY"
+    connection.sendall(ready_message.encode())
+    # Recibe los datos del archivo (nombre, peso, etc.)
+    try:
+        file_data = connection.recv(1024).decode()
+        file_name, file_size = file_data.split(',')
 
-    # Ruta completa del archivo en la carpeta "data_client"
-    file_path = os.path.join(DATA_FOLDER, file_name)
+        # Crea el directorio "data" si no existe
+        if not os.path.exists(DATA_FOLDER):
+            os.makedirs(DATA_FOLDER)
 
-    # Recibe y almacena el archivo en la carpeta "data_client"
-    with open(file_path, 'wb') as file:
-        remaining_bytes = int(file_size)
-        while remaining_bytes > 0:
-            chunk = connection.recv(1024)
-            file.write(chunk)
-            remaining_bytes -= len(chunk)
+        # Ruta completa del archivo en el directorio "data"
+        file_path = os.path.join(DATA_FOLDER, file_name)
 
-    print(f"Archivo {file_name} recibido y almacenado en {file_path}")
+        # Recibe y almacena el archivo en la carpeta "data"
+        with open(file_path, 'wb') as file:
+            remaining_bytes = int(file_size)
+            while remaining_bytes > 0:
+                chunk = connection.recv(1024)
+                file.write(chunk)
+                remaining_bytes -= len(chunk)
+        
+        connection.sendall("SUCCESS".encode())
+        print(f"Archivo {file_name} recibido y almacenado en {file_path}")
+    except UnicodeDecodeError:
+        connection.sendall("FAILURE".encode())
+        print("Ocurrio un error al recibir el archivo.")
 
 def send_file(file_path):
     i = 0
@@ -84,8 +101,7 @@ def send_file(file_path):
                             response = client_socket.recv(1024).decode()
                             if response == "SUCCESS":
                                 print(f"Archivo {file_name} enviado correctamente al nodo {node_address}")
-                            else:
-                                send_file(file_path)
+                                file_upload_success()
                             return
 
                     except ConnectionRefusedError:
@@ -94,73 +110,100 @@ def send_file(file_path):
                         print(f"Hubo un error de conexion...")
 
         print("No se encontraron nodos disponibles en el sistema o todos los nodos estaban inaccesibles.")
-        i = i + 1;
+        i = i + 1
 
-def start_client():
-    while True:
-        # Solicitar operación al usuario (SUBIR o DESCARGAR o RECIBIR)
-        #operation = input("Ingresa la operación que deseas realizar (SUBIR, DESCARGAR o RECIBIR): ")
-        operation = "SUBIR"
+    file_upload_error()    
 
-        if operation == "SUBIR":
-            # Solicitar ruta del archivo al usuario
-            file_path = input("Ingresa la ruta completa del archivo que deseas subir: ")
+def file_upload_success():
+    pop = Tk()
+    pop.withdraw()
 
-            if os.path.exists(file_path):
-                send_file(file_path)
-            else:
-                print("El archivo especificado no existe.")
+    showinfo("Éxito", "Archivo subido con éxito")
 
-        elif operation == "DESCARGAR":
-            # Solicitar nombre del archivo al usuario
-            file_name = input("Ingresa el nombre del archivo que deseas descargar: ")
+    pop.destroy()
 
-            # TODO: Agregar lógica para descargar el archivo del nodo correspondiente
+def file_upload_error():
+    pop = Tk()
+    pop.withdraw()
 
-        elif operation == "RECIBIR":
-            # Solicitar nombre del archivo al usuario
-            file_name = input("Ingresa el nombre del archivo que deseas recibir: ")
+    showinfo("Error", "Hubo un problema al subir el archivo")
 
-            available_nodes = discover_nodes()
+    pop.destroy()
 
-            if len(available_nodes) > 0:
-                for node_address in available_nodes:
-                    node_host = node_address
 
-                    # Crea un socket TCP
-                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-                        try:
-                            # Conecta el socket al nodo destino
-                            client_socket.connect((node_host, 8100))
-
-                            # Envía el comando al nodo
-                            command = "DESCARGAR"
-                            client_socket.sendall(command.encode())
-
-                            # Envía el nombre del archivo al nodo
-                            client_socket.sendall(file_name.encode())
-
-                            # Recibe la respuesta del nodo
-                            response = client_socket.recv(1024).decode()
-
-                            if response == "EXISTE":
-                                # Recibe el archivo del nodo
-                                file_size = client_socket.recv(1024).decode()
-                                receive_file(file_name, file_size, client_socket)
-
-                                print(f"Archivo {file_name} recibido correctamente.")
-                                return
-                            elif response == "NO_EXISTE":
-                                print(f"El archivo {file_name} no existe en el sistema.")
-                                break
-
-                        except ConnectionRefusedError:
-                            print(f"No se pudo conectar al nodo {node_address}. Intentando con otro nodo...")
-
-            print("No se encontraron nodos disponibles en el sistema o todos los nodos estaban inaccesibles.")
-
+def execute(operation, file_path):
+    if operation == "SUBIR":
+        if os.path.exists(file_path):
+            send_file(file_path)
         else:
-            print("Operación no válida. Inténtalo nuevamente.")
+            print("El archivo especificado no existe.")
+
+    elif operation == "DESCARGAR":
+        # Solicitar nombre del archivo al usuario
+        file_name = input("Ingresa el nombre del archivo que deseas recibir: ")
+
+        available_nodes = discover_nodes()
+
+        if len(available_nodes) > 0:
+            for node_address in available_nodes:
+                node_host = node_address
+
+                # Crea un socket TCP
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+                    try:
+                        # Conecta el socket al nodo destino
+                        client_socket.connect((node_host, 8100))
+
+                        # Envía el comando al nodo
+                        command = "DESCARGAR"
+                        client_socket.sendall(command.encode())
+
+                        # Envía el nombre del archivo al nodo
+                        client_socket.sendall(file_name.encode())
+
+                        # Recibe la respuesta del nodo
+                        response = client_socket.recv(1024).decode()
+
+                        if response == "EXISTE":
+                            # Recibe el archivo del nodo
+                            file_size = client_socket.recv(1024).decode()
+                            receive_file(file_name, file_size, client_socket)
+
+                            print(f"Archivo {file_name} recibido correctamente.")
+                            return
+                        elif response == "NO_EXISTE":
+                            print(f"El archivo {file_name} no existe en el sistema.")
+                            break
+
+                    except ConnectionRefusedError:
+                        print(f"No se pudo conectar al nodo {node_address}. Intentando con otro nodo...")
+
+        print("No se encontraron nodos disponibles en el sistema o todos los nodos estaban inaccesibles.")
+
+    else:
+        print("Operación no válida. Inténtalo nuevamente.")
+
+def select_file():
+    global PATH
+    file = filedialog.askopenfilename()
+    PATH = file
+
+def verify_path():
+    global PATH
+    if PATH is not None:
+        print("Ejecutando")
+        execute("SUBIR", PATH)
 
 if __name__ == '__main__':
-    start_client()
+    # Crea la ventana principal
+    ventana = Tk()
+
+    # Crea el botón de selección de archivo
+    fileButton = Button(ventana, text="Seleccionar archivo", command=select_file)
+    fileButton.pack()
+
+    uploadButton = Button(ventana, text="Subir", command=verify_path)
+    uploadButton.pack()
+
+    # Ejecuta el bucle principal de la ventana
+    ventana.mainloop()

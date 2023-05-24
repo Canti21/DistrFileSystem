@@ -73,7 +73,7 @@ def receive_file(connection):
 
         # Actualiza la información de archivos en este nodo
         with mutex:
-            archivos_nodos[file_name] = str(socket.gethostbyname(socket.gethostname()))
+            archivos_nodos[file_name] = HOST
 
     except UnicodeDecodeError:
         connection.sendall("FAILURE".encode())
@@ -167,22 +167,107 @@ def receive_replica(connection):
         connection.sendall("FAILURE".encode())
         print("Ocurrio un error al recibir el archivo.")
 
-def send_file(connection, file_name):
+def send_file(file_path):
+    i = 0
+    while i < 3:
+        available_nodes = discover_nodes()
+
+        if len(available_nodes) > 0:
+            file_name = os.path.basename(file_path)
+
+            for node_address in available_nodes:
+                node_host = node_address
+
+                # Crea un socket TCP
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+                    try:
+                        # Conecta el socket al nodo destino
+                        client_socket.connect((node_host, 8100))
+
+                        # Envía el comando al nodo
+                        command = "ENVIAR"
+                        client_socket.sendall(command.encode())
+
+                        # Recibe la respuesta del nodo
+                        response = client_socket.recv(1024).decode()
+
+                        if response == "READY":
+                            # Obtiene el tamaño del archivo
+                            file_size = os.path.getsize(file_path)
+
+                            # Envía los datos del archivo (nombre y tamaño)
+                            file_data = f"{file_name},{file_size}"
+                            client_socket.sendall(file_data.encode())
+
+                            # Lee y envía el contenido del archivo en bloques
+                            with open(file_path, 'rb') as file:
+                                for chunk in iter(lambda: file.read(1024), b''):
+                                    client_socket.sendall(chunk)
+                            
+                            response = client_socket.recv(1024).decode()
+                            if response == "SUCCESS":
+                                print(f"Archivo {file_name} enviado correctamente al usuario en {node_address}")
+                            return
+
+                    except ConnectionRefusedError:
+                        print(f"No se pudo conectar al nodo {node_address}. Intentando con otro nodo...")
+                    except ConnectionResetError:
+                        print(f"Hubo un error de conexion...")
+
+        print("No se encontraron nodos disponibles en el sistema o todos los nodos estaban inaccesibles.")
+        i = i + 1
+
+def check_file(connection, file_name):
     # Ruta completa del archivo en el directorio "data"
     file_path = os.path.join(DATA_FOLDER, file_name)
 
     if os.path.isfile(file_path):
-        # El archivo existe en este nodo, se envía al usuario
-        with open(file_path, 'rb') as file:
-            file_data = file.read()
-
-        # Envía los datos del archivo al cliente
-        connection.sendall(file_data)
+        send_file(file_path)
         print(f"Archivo {file_name} enviado al usuario")
     else:
-        # El archivo no existe en este nodo
-        connection.sendall(b"El archivo solicitado no existe en este nodo")
-        print(f"El archivo {file_name} no existe en este nodo")
+        # El archivo no existe en este nodo, verificar en otros nodos
+        available_nodes = discover_nodes()
+        available_nodes.remove(HOST)
+
+        replicas_encontradas = False
+        for node_address in available_nodes:
+            node_host = node_address
+
+            # Crea un socket TCP
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+                try:
+                    # Conecta el socket al nodo
+                    client_socket.connect((node_host, PORT))
+
+                    # Envía el comando al nodo
+                    command = "RECUPERAR"
+                    client_socket.sendall(command.encode())
+
+                    # Envía el nombre del archivo al nodo
+                    client_socket.sendall(file_name.encode())
+
+                    # Recibe la respuesta del nodo
+                    response = client_socket.recv(1024).decode()
+
+                    if response != "El archivo solicitado no existe en este nodo":
+                        # El archivo existe en el nodo, se envía al cliente
+                        connection.sendall(response.encode())
+                        replicas_encontradas = True
+                        break
+
+                except ConnectionRefusedError:
+                    print(f"No se pudo conectar al nodo {node_address}. Intentando con otro nodo...")
+                except UnicodeDecodeError:
+                    print(f"Error al decodificar la respuesta del nodo {node_address}. Intentando con otro nodo...")
+
+        if not replicas_encontradas:
+            # El archivo no existe en ningún nodo
+            message = "El archivo solicitado no existe en ningún nodo"
+            connection.sendall(message.encode())
+            print(f"El archivo {file_name} no existe en ningún nodo")
+
+    connection.close()
+
 
 def register_to_server():
     # Crea un socket TCP para conectarse al servidor de nodos
