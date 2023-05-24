@@ -31,36 +31,6 @@ def discover_nodes():
     # Retorna la lista de nodos disponibles
     return respuesta.split(',')
 
-def receive_file(connection):
-    # Notifica al cliente que el nodo está listo para recibir
-    ready_message = "READY"
-    connection.sendall(ready_message.encode())
-    # Recibe los datos del archivo (nombre, peso, etc.)
-    try:
-        file_data = connection.recv(1024).decode()
-        file_name, file_size = file_data.split(',')
-
-        # Crea el directorio "data" si no existe
-        if not os.path.exists(DATA_FOLDER):
-            os.makedirs(DATA_FOLDER)
-
-        # Ruta completa del archivo en el directorio "data"
-        file_path = os.path.join(DATA_FOLDER, file_name)
-
-        # Recibe y almacena el archivo en la carpeta "data"
-        with open(file_path, 'wb') as file:
-            remaining_bytes = int(file_size)
-            while remaining_bytes > 0:
-                chunk = connection.recv(1024)
-                file.write(chunk)
-                remaining_bytes -= len(chunk)
-        
-        connection.sendall("SUCCESS".encode())
-        print(f"Archivo {file_name} recibido y almacenado en {file_path}")
-    except UnicodeDecodeError:
-        connection.sendall("FAILURE".encode())
-        print("Ocurrio un error al recibir el archivo.")
-
 def send_file(file_path):
     i = 0
     while i < 3:
@@ -112,7 +82,53 @@ def send_file(file_path):
         print("No se encontraron nodos disponibles en el sistema o todos los nodos estaban inaccesibles.")
         i = i + 1
 
-    file_upload_error()    
+    file_upload_error()
+
+def receive_file(file_name):
+    available_nodes = discover_nodes()
+    for node in available_nodes:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+            try:
+                # Conecta el socket al nodo destino
+                client_socket.connect((node, 8100))
+
+                # Envía el comando al nodo
+                command = "DESCARGAR"
+                client_socket.sendall(command.encode())
+
+                client_socket.sendall(file_name.encode())
+
+                existe = client_socket.recv(1024).decode()
+
+                if existe:
+                    client_socket.sendall("READY".encode())
+                    file_data = client_socket.recv(1024).decode()
+                    file_name, file_size = file_data.split(',')
+
+                    # Crea el directorio "data" si no existe
+                    if not os.path.exists(DATA_FOLDER):
+                        os.makedirs(DATA_FOLDER)
+
+                    # Ruta completa del archivo en el directorio "data"
+                    file_path = os.path.join(DATA_FOLDER, file_name)
+
+                    # Recibe y almacena el archivo en la carpeta "data"
+                    with open(file_path, 'wb') as file:
+                        remaining_bytes = int(file_size)
+                        while remaining_bytes > 0:
+                            chunk = client_socket.recv(1024)
+                            file.write(chunk)
+                            remaining_bytes -= len(chunk)
+                    
+                    client_socket.sendall("SUCCESS".encode())
+                    print(f"Archivo {file_name} recibido y almacenado en {file_path}")
+                else:
+                    file_404()
+
+            except ConnectionRefusedError:
+                print(f"No se pudo conectar al nodo {node}. Intentando con otro nodo...")
+            except ConnectionResetError:
+                print(f"Hubo un error de conexion...")
 
 def file_upload_success():
     pop = Tk()
@@ -130,6 +146,22 @@ def file_upload_error():
 
     pop.destroy()
 
+def file_404():
+    pop = Tk()
+    pop.withdraw()
+
+    showinfo("Error", "El archivo no existe en el sistema")
+
+    pop.destroy()
+
+def file_download_error():
+    pop = Tk()
+    pop.withdraw()
+
+    showinfo("Error", "Hubo un problema al descargar el archivo")
+
+    pop.destroy()
+
 
 def execute(operation, file_path):
     if operation == "SUBIR":
@@ -140,43 +172,7 @@ def execute(operation, file_path):
 
     elif operation == "DESCARGAR":
         
-        available_nodes = discover_nodes()
-
-        if len(available_nodes) > 0:
-            for node_address in available_nodes:
-                node_host = node_address
-
-                # Crea un socket TCP
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-                    try:
-                        # Conecta el socket al nodo destino
-                        client_socket.connect((node_host, 8100))
-
-                        # Envía el comando al nodo
-                        command = "DESCARGAR"
-                        client_socket.sendall(command.encode())
-
-                        # Envía el nombre del archivo al nodo
-                        client_socket.sendall(file_path.encode())
-
-                        # Recibe la respuesta del nodo
-                        response = client_socket.recv(1024).decode()
-
-                        if response == "EXISTE":
-                            # Recibe el archivo del nodo
-                            file_size = client_socket.recv(1024).decode()
-                            receive_file(client_socket)
-
-                            print(f"Archivo {file_path} recibido correctamente.")
-                            return
-                        elif response == "NO_EXISTE":
-                            print(f"El archivo {file_path} no existe en el sistema.")
-                            break
-
-                    except ConnectionRefusedError:
-                        print(f"No se pudo conectar al nodo {node_address}. Intentando con otro nodo...")
-
-        print("No se encontraron nodos disponibles en el sistema o todos los nodos estaban inaccesibles.")
+        receive_file(file_path)
 
     else:
         print("Operación no válida. Inténtalo nuevamente.")
