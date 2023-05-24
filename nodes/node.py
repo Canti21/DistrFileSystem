@@ -69,7 +69,7 @@ def receive_file(connection):
         print(f"Archivo {file_name} recibido y almacenado en {file_path}")
 
         # Replica el archivo en otro nodo
-        replicate_file(file_name)
+        send_file_replica(file_name)
 
         # Actualiza la información de archivos en este nodo
         with mutex:
@@ -79,52 +79,57 @@ def receive_file(connection):
         connection.sendall("FAILURE".encode())
         print("Ocurrio un error al recibir el archivo.")
 
-def replicate_file(file_name):
+def send_file_replica(file_path):
     i = 0
     while i < 3:
-        try:
-            # Descubre otro nodo disponible para replicar el archivo
-            with mutex:
-                available_nodes = discover_nodes()
+        available_nodes = discover_nodes()
 
-            if len(available_nodes) > 1:
-                # Elimina el nodo actual de la lista de nodos disponibles
-                available_nodes.remove(HOST)
+        if len(available_nodes) > 0:
+            file_name = os.path.basename(file_path)
 
-                # Elige un nodo al azar para replicar el archivo
-                for node in available_nodes:
+            for node_address in available_nodes:
+                node_host = node_address
 
-                    # Crea un socket TCP para conectarse al nodo de replicación
-                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as node_socket:
-                        try:
-                            # Conecta el socket al nodo de replicación
-                            node_socket.connect((node, PORT))
+                # Crea un socket TCP
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+                    try:
+                        # Conecta el socket al nodo destino
+                        client_socket.connect((node_host, 8100))
 
-                            # Envía el mensaje de registro al nodo de replicación (opcional)
-                            node_socket.sendall("REPLICAR".encode())
+                        # Envía el comando al nodo
+                        command = "ENVIAR"
+                        client_socket.sendall(command.encode())
 
-                            # Lee el contenido del archivo
-                            file_path = os.path.join(DATA_FOLDER, file_name)
+                        # Recibe la respuesta del nodo
+                        response = client_socket.recv(1024).decode()
+
+                        if response == "READY":
+                            # Obtiene el tamaño del archivo
+                            file_size = os.path.getsize(file_path)
+
+                            # Envía los datos del archivo (nombre y tamaño)
+                            file_data = f"{file_name},{file_size}"
+                            client_socket.sendall(file_data.encode())
+
+                            # Lee y envía el contenido del archivo en bloques
                             with open(file_path, 'rb') as file:
-                                file_data = file.read()
-
-                            # Envía el archivo al nodo de replicación
-                            node_socket.sendall(file_data)
-
-                            response = node_socket.recv(1024).decode()
+                                for chunk in iter(lambda: file.read(1024), b''):
+                                    client_socket.sendall(chunk)
+                            
+                            response = client_socket.recv(1024).decode()
                             if response == "SUCCESS":
-                                print(f"Archivo {file_name} replicado en nodo {node}")
-                                return
-                        except ConnectionRefusedError:
-                            print(f"No se pudo replicar el archivo {file_name} en nodo {node}")
-                        finally:
-                            # Cierra la conexión con el nodo de replicación
-                            node_socket.close()
-            else:
-                print(f"No hay nodos disponibles para replicar el archivo {file_name}")
-        except ValueError:
-            pass
-        i = i + 1
+                                print(f"Replica {file_name} enviado correctamente al nodo {node_address}")
+                            else:
+                                send_file(file_path)
+                            return
+
+                    except ConnectionRefusedError:
+                        print(f"No se pudo conectar al nodo {node_address}. Intentando con otro nodo...")
+                    except ConnectionResetError:
+                        print(f"Hubo un error de conexion...")
+
+        print("No se encontraron nodos disponibles en el sistema o todos los nodos estaban inaccesibles.")
+        i = i + 1;
 
 def receive_replica(connection):
     try:
