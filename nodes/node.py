@@ -37,6 +37,22 @@ def receive_file(connection):
 def start_node():
     # Crea un socket TCP
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        # Anunciando al servidor de nodos que estamos en linea:
+
+        try:
+            server_socket.connect((SERV_HOST, SERV_PORT))
+            print(f"Anunciando a central en {SERV_HOST}: {SERV_PORT}")
+
+            mensaje = "REGISTRO"
+            server_socket.send(mensaje.encode())
+
+            respuesta = server_socket.recv(1024).decode()
+            print(f"Respuesta del servidor: {respuesta}")
+        except ConnectionRefusedError:
+            print("No se pudo establecer la conexion...")
+        finally:
+            server_socket.close()
+
         # Enlace del socket a la dirección IP y puerto especificados
         server_socket.bind((HOST, PORT))
 
