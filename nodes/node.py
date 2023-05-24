@@ -35,24 +35,24 @@ def receive_file(connection):
     print(f"Archivo {file_name} recibido y almacenado en {file_path}")
 
 def start_node():
-    # Crea un socket TCP
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-        # Anunciando al servidor de nodos que estamos en linea:
-
+    # Anunciando al servidor de nodos que estamos en linea:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serv:
         try:
-            server_socket.connect((SERV_HOST, SERV_PORT))
+            serv.connect((SERV_HOST, SERV_PORT))
             print(f"Anunciando a central en {SERV_HOST}: {SERV_PORT}")
 
             mensaje = "REGISTRO"
-            server_socket.send(mensaje.encode())
+            serv.send(mensaje.encode())
 
-            respuesta = server_socket.recv(1024).decode()
+            respuesta = serv.recv(1024).decode()
             print(f"Respuesta del servidor: {respuesta}")
         except ConnectionRefusedError:
             print("No se pudo establecer la conexion...")
         finally:
-            server_socket.close()
+            serv.close()
 
+    # Crea un socket TCP
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         # Enlace del socket a la dirección IP y puerto especificados
         server_socket.bind((HOST, PORT))
 
