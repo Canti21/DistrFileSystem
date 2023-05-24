@@ -5,7 +5,7 @@ import socket
 HOST = '192.168.1.74'
 PORT = 8100
 
-# Direccion y puerto del servidor de nodos
+# Dirección y puerto del servidor de nodos
 SERV_HOST = '192.168.1.72'
 SERV_PORT = 8000
 
@@ -24,6 +24,10 @@ def receive_file(connection):
     # Ruta completa del archivo en el directorio "data"
     file_path = os.path.join(DATA_FOLDER, file_name)
 
+    # Notifica al cliente que el nodo esta listo para recibir
+    ready_message = "READY"
+    connection.send(ready_message.encode())
+
     # Recibe y almacena el archivo en la carpeta "data"
     with open(file_path, 'wb') as file:
         remaining_bytes = int(file_size)
@@ -34,8 +38,25 @@ def receive_file(connection):
 
     print(f"Archivo {file_name} recibido y almacenado en {file_path}")
 
+def send_file(connection, file_name):
+    # Ruta completa del archivo en el directorio "data"
+    file_path = os.path.join(DATA_FOLDER, file_name)
+
+    if os.path.isfile(file_path):
+        # El archivo existe en este nodo, se envía al usuario
+        with open(file_path, 'rb') as file:
+            file_data = file.read()
+
+        # Envía los datos del archivo al cliente
+        connection.sendall(file_data)
+        print(f"Archivo {file_name} enviado al usuario")
+    else:
+        # El archivo no existe en este nodo
+        connection.sendall(b"El archivo solicitado no existe en este nodo")
+        print(f"El archivo {file_name} no existe en este nodo")
+
 def start_node():
-    # Anunciando al servidor de nodos que estamos en linea:
+    # Anunciando al servidor de nodos que estamos en línea
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serv:
         try:
             serv.connect((SERV_HOST, SERV_PORT))
@@ -47,7 +68,7 @@ def start_node():
             respuesta = serv.recv(1024).decode()
             print(f"Respuesta del servidor: {respuesta}")
         except ConnectionRefusedError:
-            print("No se pudo establecer la conexion...")
+            print("No se pudo establecer la conexión...")
         finally:
             serv.close()
 
@@ -67,8 +88,17 @@ def start_node():
 
             print(f"Conexión establecida desde {address}")
 
-            # Recibe el archivo
-            receive_file(connection)
+            # Recibe el comando del cliente
+            command = connection.recv(1024).decode()
+
+            if command == 'ENVIAR':
+                # El cliente quiere enviar un archivo
+                receive_file(connection)
+            elif command == 'RECUPERAR':
+                # El cliente quiere recuperar un archivo
+                file_name = connection.recv(1024).decode()
+                print(f"Solicitando archivo: {file_name}")
+                send_file(connection, file_name)
 
             # Cierra la conexión con el cliente
             connection.close()
