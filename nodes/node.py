@@ -1,6 +1,7 @@
 import os
 import socket
 import threading
+import time
 
 # Dirección IP y puerto en el que el nodo escuchará las conexiones
 HOST = '192.168.1.74'
@@ -23,6 +24,9 @@ archivos_nodos = {}
 mutex = threading.Lock()
 
 def receive_file(connection):
+    # Notifica al cliente que el nodo esta listo para recibir
+    ready_message = "READY"
+    connection.sendall(ready_message.encode())
     # Recibe los datos del archivo (nombre, peso, etc.)
     file_data = connection.recv(1024).decode()
     file_name, file_size = file_data.split(',')
@@ -34,9 +38,6 @@ def receive_file(connection):
     # Ruta completa del archivo en el directorio "data"
     file_path = os.path.join(DATA_FOLDER, file_name)
 
-    # Notifica al cliente que el nodo esta listo para recibir
-    ready_message = "READY"
-    connection.sendall(ready_message.encode())
 
     # Recibe y almacena el archivo en la carpeta "data"
     with open(file_path, 'wb') as file:
@@ -111,8 +112,8 @@ def send_file(connection, file_name):
         connection.sendall(b"El archivo solicitado no existe en este nodo")
         print(f"El archivo {file_name} no existe en este nodo")
 
-def start_node():
-    # Anunciando al servidor de nodos que estamos en línea
+def register_to_server():
+    # Crea un socket TCP para conectarse al servidor de nodos
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serv:
         try:
             serv.connect((SERV_HOST, SERV_PORT))
@@ -123,10 +124,29 @@ def start_node():
 
             respuesta = serv.recv(1024).decode()
             print(f"Respuesta del servidor: {respuesta}")
+
+            # Actualiza la lista de nodos disponibles
+            with mutex:
+                nodos_disponibles.extend(respuesta.split(','))
         except ConnectionRefusedError:
-            print("No se pudo establecer la conexión...")
+            print("No se pudo establecer la conexión con el servidor de nodos.")
         finally:
             serv.close()
+
+def update_available_nodes():
+    while True:
+        time.sleep(10)  # Espera 10 segundos antes de actualizar la lista de nodos disponibles
+
+        # Vuelve a registrarse en el servidor de nodos
+        register_to_server()
+
+def start_node():
+    # Anuncia al servidor de nodos que estamos en línea
+    register_to_server()
+
+    # Crea un hilo para actualizar la lista de nodos disponibles periódicamente
+    update_thread = threading.Thread(target=update_available_nodes)
+    update_thread.start()
 
     # Crea un socket TCP
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
