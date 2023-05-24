@@ -99,7 +99,6 @@ def receive_file(file_name):
                 client_socket.sendall(file_name.encode())
 
                 existe = client_socket.recv(1024).decode()
-                print(f"HELOOOOO: {existe}")
 
                 if existe == "EXISTE":
                     client_socket.sendall("READY".encode())

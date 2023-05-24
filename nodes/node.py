@@ -224,6 +224,7 @@ def start_node():
                 file_size = os.path.getsize(file_path)
 
                 # Verifica si el archivo existe en el nodo actual
+                print(f"path: {file_path}")
                 if os.path.exists(file_path):
                     # Notifica al cliente que el archivo existe en el nodo actual
                     connection.sendall("EXISTE".encode())
