@@ -240,7 +240,7 @@ def start_node():
                         connection.sendall(file_data.encode())
 
                         # Envía el contenido del archivo en bloques
-                        with open(file_path, 'rb') as file:
+                        with open(file_data, 'rb') as file:
                             for chunk in iter(lambda: file.read(1024), b''):
                                 connection.sendall(chunk)
 

@@ -99,8 +99,9 @@ def receive_file(file_name):
                 client_socket.sendall(file_name.encode())
 
                 existe = client_socket.recv(1024).decode()
+                print(f"HELOOOOO: {existe}")
 
-                if existe:
+                if existe == "EXISTE":
                     client_socket.sendall("READY".encode())
                     file_data = client_socket.recv(1024).decode()
                     file_name, file_size = file_data.split(',')
