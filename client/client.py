@@ -28,7 +28,7 @@ def send_file(file_path):
 
     if len(available_nodes) > 0:
         node_address = available_nodes[0]
-        node_host, node_port = node_address.split(':')
+        node_host = node_address
 
         # Obtiene el nombre y el tamaño del archivo
         file_name = os.path.basename(file_path)

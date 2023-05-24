@@ -8,7 +8,7 @@ def procesar_mensaje(mensaje, cliente):
 
     if mensaje == "REGISTRO":
         # Registrar nuevo nodo
-        nodos_disponibles.append(str(cliente))
+        nodos_disponibles.append(cliente.getpeername()[0])
         print(f"Nodo registrado: {cliente}")
     elif mensaje == "DESCUBRIR":
         # Enviar lista de nodos disponibles al cliente
